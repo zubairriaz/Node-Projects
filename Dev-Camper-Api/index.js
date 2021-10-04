@@ -2,6 +2,8 @@ const dotenv = require("dotenv").config({ path: "config/config.env" });
 const express = require("express");
 const morgan = require("morgan");
 const bootcamps = require("./routes/bootcamps");
+const courses = require("./routes/courses");
+
 const {connectDB} = require("./config/db")
 const errorHandler = require("./middleware/errorHandler")
 
@@ -18,6 +20,7 @@ connectDB();
 
 
 app.use("/api/v1/bootcamps",bootcamps)
+app.use("/api/v1/courses",courses)
 app.use(errorHandler)
 
 

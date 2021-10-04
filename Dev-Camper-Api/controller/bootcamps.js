@@ -3,16 +3,60 @@ const ErrorResponse = require("../utils/ErrorResponse");
 const asyncHandler = require("../middleware/async");
 const geocoder = require("../utils/geocoder");
 
+
+// @desc      Get bootcamps within a radius
+// @route     GET /api/v1/bootcamps
+// @access    Public
 exports.getAllBootCamps = asyncHandler(async (req, res, next) => {
-	let queryString  = JSON.stringify(req.query);
+	let queryToRemoved = ["select", "sort"];
+	let queryCopy = { ...req.query };
+	queryToRemoved.map((qP) => delete queryCopy[qP]);
+	let queryString = JSON.stringify(queryCopy);
 
-	queryString = queryString.replace(/in|gte|gt|lte|lt/gm,match=>`$${match}`);
-	console.log(queryString)
+	queryString = queryString.replace(
+		/in|gte|gt|lte|lt/gm,
+		(match) => `$${match}`,
+	);
 
-	console.log(JSON.parse(queryString))
-	let query = Bootcamp.find(JSON.parse(queryString)); 
-	const bootcamps = await query
-	res.status(200).send({ sucess: true, data: bootcamps });
+	let query = Bootcamp.find(JSON.parse(queryString));
+
+	if (req.query.select) {
+		let selectClause = req.query.select;
+		selectClause = selectClause.split(",").join(" ");
+		query.select(selectClause);
+	}
+
+	if (req.query.sort) {
+		let sortClause = req.query.sort;
+		sortClause = sortClause.split(",").join(" ");
+		query.sort(sortClause);
+	}
+
+	//pagination
+	const page = parseInt(req.query.page) || 1;
+	const limit = parseInt(req.query.limit) || 1;
+	const startIndex = (page - 1) * limit;
+	const endIndex = page * limit;
+	const total = await Bootcamp.countDocuments();
+
+	const pagination = {};
+
+	if (endIndex < total) {
+		pagination.next = {
+			page: page + 1,
+			limit,
+		};
+	}
+
+	if (startIndex > 0) {
+		pagination.prev = {
+			page: page - 1,
+			limit,
+		};
+	}
+
+	const bootcamps = await query.skip(startIndex).limit(limit);
+	res.status(200).send({ sucess: true, pagination, data: bootcamps });
 });
 
 exports.getSingleBootCamps = asyncHandler(async (req, res, next) => {
@@ -65,16 +109,15 @@ exports.getBootCampsWithInRadius = asyncHandler(async (req, res, next) => {
 	const { zipcode, distance } = req.params;
 
 	const loc = await geocoder.geocode(zipcode);
-	console.log(loc)
+	console.log(loc);
 	const lon = loc[0].longitude;
 	const lat = loc[0].latitude;
-
 
 	const radius = distance / 3963;
 	const bootcamps = await Bootcamp.find({
 		location: { $geoWithin: { $centerSphere: [[lon, lat], radius] } },
 	});
-	console.log(bootcamps)
+	console.log(bootcamps);
 	res.status(200).send({
 		sucess: true,
 		data: bootcamps,
